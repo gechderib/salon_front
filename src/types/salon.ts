@@ -26,6 +26,8 @@ export type Business = {
     phone: string;
     logo?: string;
     working_hours: string;
+    open_time: string;
+    close_time: string;
     owner: number;
 };
 

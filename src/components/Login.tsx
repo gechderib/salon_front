@@ -14,6 +14,7 @@ declare global {
 const Login: React.FC = () => {
     const { user, login, isLoading } = useAuth();
     const [error, setError] = useState<string | null>(null);
+    const [role, setRole] = useState<'customer' | 'business'>('customer');
 
     useEffect(() => {
         // Add the Telegram Login script
@@ -27,13 +28,17 @@ const Login: React.FC = () => {
 
         const widget = document.getElementById('telegram-widget');
         if (widget) {
+            widget.innerHTML = ''; // Clear before adding
             widget.appendChild(script);
         }
 
         // Set up the Telegram callback
         window.onTelegramAuth = async (data: any) => {
             try {
-                const response = await api.post('/api/auth/telegram-login/', { telegram_data: data });
+                const response = await api.post('/api/auth/telegram-login/', {
+                    telegram_data: data,
+                    role: role // Use current role state
+                });
                 if (response.data.success) {
                     login(response.data.data.user, response.data.data.access, response.data.data.refresh);
                     setError(null);
@@ -46,16 +51,18 @@ const Login: React.FC = () => {
         };
 
         return () => {
-            // Clean up script on unmount
             if (widget) {
                 widget.innerHTML = '';
             }
         };
-    }, [login]);
+    }, [login, role]); // Re-run when role changes to update callback
 
     const handleGoogleSuccess = async (googleResponse: any) => {
         try {
-            const response = await api.post('/api/auth/google-login/', { id_token: googleResponse.credential });
+            const response = await api.post('/api/auth/google-login/', {
+                id_token: googleResponse.credential,
+                role: role
+            });
             if (response.data.success) {
                 login(response.data.data.user, response.data.data.access, response.data.data.refresh);
                 setError(null);
@@ -84,39 +91,56 @@ const Login: React.FC = () => {
     }
 
     return (
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-10 border border-gray-100">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 sm:p-10 border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="text-center space-y-2 mb-10">
                 <div className="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-indigo-200 shadow-xl transform rotate-3 hover:rotate-0 transition-transform cursor-default">
                     <LogIn className="w-8 h-8 text-white" />
                 </div>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Salon Login</h1>
-                <p className="text-gray-500 font-medium">Choose your preferred login method</p>
+                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Welcome Back</h1>
+                <p className="text-gray-500 font-medium">Join us as a customer or business owner</p>
+            </div>
+
+            {/* Role Selector */}
+            <div className="bg-gray-50 p-1.5 rounded-2xl flex mb-8 border border-gray-100">
+                <button
+                    onClick={() => setRole('customer')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${role === 'customer' ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Customer
+                </button>
+                <button
+                    onClick={() => setRole('business')}
+                    className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${role === 'business' ? 'bg-white text-indigo-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                    Business
+                </button>
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl text-rose-700 font-medium text-sm animate-pulse">
+                <div className="mb-6 p-4 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl text-rose-700 font-medium text-sm">
                     {error}
                 </div>
             )}
 
             <div className="space-y-6">
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex flex-col items-center gap-6">
                     <div className="w-full flex justify-center shadow-sm">
                         <GoogleLogin
                             onSuccess={handleGoogleSuccess}
                             onError={handleGoogleError}
                             useOneTap
                             shape="pill"
+                            text="signin_with"
                         />
                     </div>
 
                     <div className="flex items-center gap-4 w-full px-4">
                         <div className="h-px flex-1 bg-gray-100"></div>
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">or</span>
+                        <span className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">Social Connect</span>
                         <div className="h-px flex-1 bg-gray-100"></div>
                     </div>
 
-                    <div id="telegram-widget" className="w-full flex justify-center hover:scale-[1.02] transition-transform"></div>
+                    <div id="telegram-widget" className="w-full flex justify-center hover:scale-[1.02] transition-transform overflow-hidden rounded-xl"></div>
                 </div>
             </div>
 

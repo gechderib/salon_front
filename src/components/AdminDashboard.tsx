@@ -30,7 +30,11 @@ const AdminDashboard: React.FC = () => {
         name: '',
         address: '',
         map_url: '',
-        working_hours: ''
+        working_hours: '',
+        phone: '',
+        description: '',
+        open_time: '09:00',
+        close_time: '18:00'
     });
 
     useEffect(() => {
@@ -48,7 +52,7 @@ const AdminDashboard: React.FC = () => {
                 setBookings(bookingsRes.data.data);
 
                 if (userSalons.length > 0) {
-                    setNewService(s => ({ ...s, business: userSalons[0].id }));
+                    setNewService((s) => ({ ...s, business: userSalons[0]!.id }));
                 }
             } catch (error) {
                 console.error('Error fetching admin data:', error);
@@ -91,13 +95,13 @@ const AdminDashboard: React.FC = () => {
             if (editingService) {
                 const response = await api.put(`/api/services/${editingService.id}/`, newService);
                 if (response.data.success) {
-                    setServices(services.map(s => s.id === editingService.id ? response.data.data : s));
+                    setServices(services.map((s: Service) => s.id === editingService.id ? response.data.data : s));
                     setShowServiceForm(false);
                 }
             } else {
                 const response = await api.post('/api/services/', newService);
                 if (response.data.success) {
-                    setServices(prev => [...prev, response.data.data]);
+                    setServices((prev: Service[]) => [...prev, response.data.data]);
                     setShowServiceForm(false);
                 }
             }
@@ -112,11 +116,25 @@ const AdminDashboard: React.FC = () => {
         try {
             const response = await api.delete(`/api/services/${serviceId}/`);
             if (response.data.success) {
-                setServices(prev => prev.filter(s => s.id !== serviceId));
+                setServices((prev: Service[]) => prev.filter((s: Service) => s.id !== serviceId));
             }
         } catch (error) {
             console.error('Error deleting service:', error);
         }
+    };
+
+    const handleEditSalon = (salon: Business) => {
+        setEditingSalon(salon);
+        setSalonFormData({
+            name: salon.name,
+            address: salon.address,
+            map_url: salon.map_url || '',
+            working_hours: salon.working_hours,
+            phone: salon.phone || '', // Restored phone
+            description: salon.description || '', // Restored description
+            open_time: salon.open_time ? salon.open_time.substring(0, 5) : '09:00',
+            close_time: salon.close_time ? salon.close_time.substring(0, 5) : '18:00'
+        });
     };
 
     const handleUpdateBookingStatus = async (bookingId: number, status: string) => {
@@ -128,7 +146,7 @@ const AdminDashboard: React.FC = () => {
 
             const response = await api.post(`/api/bookings/${bookingId}/${endpoint}/`, {});
             if (response.data.success) {
-                setBookings(bookings.map(b => b.id === bookingId ? response.data.data : b));
+                setBookings(bookings.map((b: Booking) => b.id === bookingId ? response.data.data : b));
             }
         } catch (error) {
             console.error('Error updating booking:', error);
@@ -136,40 +154,142 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
-    const handleEditSalon = (salon: Business) => {
-        setEditingSalon(salon);
-        setSalonFormData({
-            name: salon.name,
-            address: salon.address,
-            map_url: salon.map_url || '',
-            working_hours: salon.working_hours
-        });
-    };
-
     const handleSaveSalon = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingSalon) return;
         try {
-            const response = await api.put(`/api/businesses/${editingSalon.id}/`, salonFormData);
-            if (response.data.success) {
-                setMySalons(mySalons.map(s => s.id === editingSalon.id ? response.data.data : s));
-                setEditingSalon(null);
+            if (editingSalon) {
+                // Update existing salon
+                const response = await api.put(`/api/businesses/${editingSalon.id}/`, salonFormData);
+                if (response.data.success) {
+                    setMySalons(mySalons.map((s: Business) => s.id === editingSalon.id ? response.data.data : s));
+                    setEditingSalon(null);
+                }
+            } else {
+                // Create new salon
+                const response = await api.post('/api/businesses/', salonFormData);
+                if (response.data.success) {
+                    setMySalons([response.data.data]);
+                    setNewService((s) => ({ ...s, business: response.data.data.id }));
+                }
             }
-        } catch (error) {
-            console.error('Error updating salon:', error);
+        } catch (error: any) {
+            console.error('Error saving salon:', error);
+            alert(error.response?.data?.message || 'Failed to save salon profile. Please check all fields.');
         }
     };
 
-    if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
+    if (loading) return (
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <p className="text-gray-400 font-bold animate-pulse">Loading your dashboard...</p>
+        </div>
+    );
 
-    if (!user?.is_business_approved) {
+    if (user?.is_business && mySalons.length === 0) {
         return (
-            <div className="max-w-2xl mx-auto text-center py-20 space-y-6">
-                <div className="bg-amber-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Info className="w-10 h-10 text-amber-600" />
+            <div className="max-w-3xl mx-auto py-10 px-6 animate-in slide-in-from-bottom-8 duration-700">
+                <div className="text-center mb-12 space-y-4">
+                    <div className="bg-indigo-600 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-indigo-100 rotate-3">
+                        <Store className="w-10 h-10 text-white" />
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tighter">Setup Your <span className="text-indigo-600">Salon</span></h1>
+                    <p className="text-gray-500 font-medium text-lg">Create your professional profile to start receiving bookings</p>
                 </div>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight">Account Pending Approval</h1>
-                <p className="text-gray-500 font-medium leading-relaxed px-10">Our team is currently reviewing your business details. You'll receive full access to the dashboard once your account is verified.</p>
+
+                <form onSubmit={handleSaveSalon} className="bg-white rounded-[3rem] shadow-2xl border border-gray-100 p-8 md:p-12 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Business Name</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="E.g. Glamour Studio"
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                value={salonFormData.name}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="+1 234 567 890"
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                value={salonFormData.phone}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, phone: e.target.value })}
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Physical Address</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="123 Beauty Lane, Fashion District"
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                value={salonFormData.address}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, address: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Operating Hours (Text)</label>
+                            <input
+                                type="text"
+                                required
+                                placeholder="Mon-Fri 9:00 - 18:00"
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                value={salonFormData.working_hours}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, working_hours: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Google Maps URL (Optional)</label>
+                            <input
+                                type="url"
+                                placeholder="https://maps.google.com/..."
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                value={salonFormData.map_url}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, map_url: e.target.value })}
+                            />
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">About the Salon</label>
+                            <textarea
+                                required
+                                placeholder="Describe your salon, your specialties, and what customers can expect..."
+                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all min-h-[120px]"
+                                value={salonFormData.description}
+                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSalonFormData({ ...salonFormData, description: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 md:col-span-2">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Doors Open At</label>
+                                <input
+                                    type="time"
+                                    required
+                                    className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                    value={salonFormData.open_time}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, open_time: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Doors Close At</label>
+                                <input
+                                    type="time"
+                                    required
+                                    className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold focus:ring-4 focus:ring-indigo-50 transition-all"
+                                    value={salonFormData.close_time}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, close_time: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98]">
+                        Launch My Salon Profile
+                    </button>
+                </form>
             </div>
         );
     }
@@ -293,8 +413,57 @@ const AdminDashboard: React.FC = () => {
                                             type="text"
                                             className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
                                             value={salonFormData.address}
-                                            onChange={e => setSalonFormData({ ...salonFormData, address: e.target.value })}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, address: e.target.value })}
                                         />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone</label>
+                                            <input
+                                                type="text"
+                                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
+                                                value={salonFormData.phone}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, phone: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Operating Hours</label>
+                                            <input
+                                                type="text"
+                                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
+                                                value={salonFormData.working_hours}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, working_hours: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">About the Salon</label>
+                                        <textarea
+                                            placeholder="Tell customers what makes your salon special..."
+                                            className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold min-h-[100px]"
+                                            value={salonFormData.description}
+                                            onChange={e => setSalonFormData({ ...salonFormData, description: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Open At</label>
+                                            <input
+                                                type="time"
+                                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
+                                                value={salonFormData.open_time}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, open_time: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Close At</label>
+                                            <input
+                                                type="time"
+                                                className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
+                                                value={salonFormData.close_time}
+                                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, close_time: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">Google Maps URL <Info className="w-3 h-3" /></label>
@@ -303,7 +472,7 @@ const AdminDashboard: React.FC = () => {
                                             placeholder="https://maps.google.com/..."
                                             className="w-full px-6 py-4 bg-gray-50 rounded-2xl border-none font-bold"
                                             value={salonFormData.map_url}
-                                            onChange={e => setSalonFormData({ ...salonFormData, map_url: e.target.value })}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSalonFormData({ ...salonFormData, map_url: e.target.value })}
                                         />
                                     </div>
                                 </div>
@@ -363,7 +532,7 @@ const AdminDashboard: React.FC = () => {
                                             className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
                                             placeholder="E.g. Full Beard Sculpt"
                                             value={newService.name}
-                                            onChange={e => setNewService({ ...newService, name: e.target.value })}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewService({ ...newService, name: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -377,7 +546,7 @@ const AdminDashboard: React.FC = () => {
                                             className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
                                             placeholder="35.00"
                                             value={newService.price}
-                                            onChange={e => setNewService({ ...newService, price: e.target.value })}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewService({ ...newService, price: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -387,7 +556,7 @@ const AdminDashboard: React.FC = () => {
                                         <select
                                             className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900 appearance-none"
                                             value={newService.duration_minutes}
-                                            onChange={e => setNewService({ ...newService, duration_minutes: parseInt(e.target.value) })}
+                                            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewService({ ...newService, duration_minutes: parseInt(e.target.value) })}
                                         >
                                             <option value={15}>15 Minutes</option>
                                             <option value={30}>30 Minutes</option>
@@ -408,7 +577,7 @@ const AdminDashboard: React.FC = () => {
                                             className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900"
                                             placeholder="1"
                                             value={newService.capacity}
-                                            onChange={e => setNewService({ ...newService, capacity: parseInt(e.target.value) })}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewService({ ...newService, capacity: parseInt(e.target.value) })}
                                         />
                                     </div>
                                 </div>
@@ -420,9 +589,9 @@ const AdminDashboard: React.FC = () => {
                                         className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900 appearance-none disabled:opacity-50"
                                         disabled={!!editingService}
                                         value={newService.business}
-                                        onChange={e => setNewService({ ...newService, business: parseInt(e.target.value) })}
+                                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setNewService({ ...newService, business: parseInt(e.target.value) })}
                                     >
-                                        {mySalons.map(salon => (
+                                        {mySalons.map((salon: Business) => (
                                             <option key={salon.id} value={salon.id}>{salon.name}</option>
                                         ))}
                                     </select>
@@ -435,7 +604,7 @@ const AdminDashboard: React.FC = () => {
                                         className="w-full px-6 py-5 bg-gray-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none transition-all font-bold text-gray-900 min-h-[120px] resize-none"
                                         placeholder="What does this service include?"
                                         value={newService.description}
-                                        onChange={e => setNewService({ ...newService, description: e.target.value })}
+                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNewService({ ...newService, description: e.target.value })}
                                     />
                                 </div>
                                 <div className="flex gap-4 pt-4">
@@ -448,7 +617,7 @@ const AdminDashboard: React.FC = () => {
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {services.map(service => (
+                        {services.map((service: Service) => (
                             <div key={service.id} className="p-8 rounded-[2.5rem] border border-gray-100 bg-gray-50/10 hover:bg-white hover:border-indigo-100 hover:shadow-2xl hover:shadow-indigo-50/50 transition-all flex flex-col sm:flex-row items-center justify-between gap-6 group">
                                 <div className="flex items-center gap-6">
                                     <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center shadow-sm border border-gray-100 text-indigo-400 group-hover:scale-110 transition-transform">
@@ -505,7 +674,7 @@ const AdminDashboard: React.FC = () => {
                             {bookings.length === 0 ? (
                                 <div className="text-center py-20 text-gray-400 font-bold">No bookings recorded yet.</div>
                             ) : (
-                                bookings.map(booking => (
+                                bookings.map((booking: Booking) => (
                                     <div key={booking.id} className="p-6 bg-gray-50/50 rounded-3xl border border-gray-100 space-y-6">
                                         <div className="flex justify-between items-start">
                                             <div className="space-y-1">
@@ -586,7 +755,7 @@ const AdminDashboard: React.FC = () => {
                                             </td>
                                         </tr>
                                     ) : (
-                                        bookings.map(booking => (
+                                        bookings.map((booking: Booking) => (
                                             <tr key={booking.id} className="hover:bg-indigo-50/10 transition-colors">
                                                 <td className="px-10 py-8">
                                                     <div className="flex flex-col gap-1">
