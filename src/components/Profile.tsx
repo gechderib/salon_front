@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import { Settings, ShieldCheck, Mail, Phone, Briefcase, CheckCircle2, AlertCircle, User as UserIcon } from 'lucide-react';
+import { Settings, ShieldCheck, Mail, Phone, CheckCircle2, User as UserIcon } from 'lucide-react';
 
 const Profile: React.FC = () => {
     const { user, updateUser } = useAuth();
@@ -32,22 +32,6 @@ const Profile: React.FC = () => {
         }
     };
 
-    const handleBecomeBusiness = async () => {
-        if (!window.confirm('Are you sure you want to request a business account?')) return;
-
-        setLoading(true);
-        try {
-            const response = await api.post('/api/users/become-business/', {});
-            if (response.data.success) {
-                updateUser(response.data.data);
-                setMessage({ type: 'success', text: 'Request sent! Awaiting admin approval.' });
-            }
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.response?.data?.message || 'Request failed.' });
-        } finally {
-            setLoading(false);
-        }
-    };
 
     if (!user) return null;
 
@@ -100,37 +84,7 @@ const Profile: React.FC = () => {
                         </div>
                     </div>
 
-                    {!user.is_business && !user.is_admin_role && (
-                        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-8 text-white shadow-xl shadow-indigo-100 overflow-hidden relative">
-                            <div className="relative z-10 space-y-6">
-                                <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl w-fit">
-                                    <Briefcase className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="space-y-2">
-                                    <h4 className="text-xl font-bold">Start your business!</h4>
-                                    <p className="text-indigo-100 font-medium text-sm leading-relaxed">Boost your salon's reach by listing your services here.</p>
-                                </div>
-                                <button
-                                    onClick={handleBecomeBusiness}
-                                    disabled={loading}
-                                    className="w-full py-4 bg-white text-indigo-700 rounded-2xl font-black text-sm transition-all hover:bg-indigo-50 active:scale-95 disabled:opacity-50"
-                                >
-                                    Join as Business
-                                </button>
-                            </div>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                        </div>
-                    )}
 
-                    {user.is_business && !user.is_business_approved && (
-                        <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 flex items-start gap-4">
-                            <AlertCircle className="w-6 h-6 text-amber-500 shrink-0" />
-                            <div>
-                                <h4 className="font-bold text-amber-900">Verification Pending</h4>
-                                <p className="text-sm text-amber-700 mt-1">Your business application is being reviewed. We'll notify you soon.</p>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Update Form */}
