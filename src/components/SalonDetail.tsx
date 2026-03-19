@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import type { Business, Service } from '../types/salon';
 import { useAuth } from '../context/AuthContext';
-import { Clock, MapPin, Calendar, Scissors, ChevronLeft, CreditCard, ChevronRight, Check } from 'lucide-react';
+import { Clock, MapPin, Calendar, Scissors, ChevronLeft, CreditCard, ChevronRight, Check, X } from 'lucide-react';
 
 interface AvailabilitySlot {
     start: string;
@@ -15,7 +15,6 @@ const SalonDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
-
     const [salon, setSalon] = useState<Business | null>(null);
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,6 +25,9 @@ const SalonDetail: React.FC = () => {
     const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
     const [slotsLoading, setSlotsLoading] = useState(false);
+
+    // Basket state for multiple bookings
+    const [basket, setBasket] = useState<{ service: Service, slot: AvailabilitySlot, date: string }[]>([]);
 
     const [bookingLoading, setBookingLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -72,6 +74,33 @@ const SalonDetail: React.FC = () => {
         }
     };
 
+    const addToBasket = () => {
+        if (!selectedService || !selectedSlot) return;
+
+        // Check if already in basket
+        const exists = basket.find(item =>
+            item.service.id === selectedService.id &&
+            item.date === selectedDate &&
+            item.slot.start === selectedSlot.start
+        );
+
+        if (exists) {
+            setMessage({ type: 'error', text: 'This service is already in your basket for this time.' });
+            setTimeout(() => setMessage(null), 3000);
+            return;
+        }
+
+        setBasket([...basket, { service: selectedService, slot: selectedSlot, date: selectedDate }]);
+        setSelectedService(null);
+        setSelectedSlot(null);
+        setMessage({ type: 'success', text: 'Added to basket!' });
+        setTimeout(() => setMessage(null), 3000);
+    };
+
+    const removeFromBasket = (index: number) => {
+        setBasket(basket.filter((_, i) => i !== index));
+    };
+
     const handleConfirmBooking = async () => {
         if (!user) {
             navigate('/login');
@@ -83,20 +112,29 @@ const SalonDetail: React.FC = () => {
             return;
         }
 
-        if (!selectedService || !selectedSlot) return;
+        if (basket.length === 0 && (!selectedService || !selectedSlot)) return;
 
         setBookingLoading(true);
         try {
-            const response = await api.post('/api/bookings/', {
-                business: salon?.id,
-                service: selectedService.id,
-                date: selectedDate,
-                start_time: selectedSlot.start,
-                end_time: selectedSlot.end
-            });
+            const bookingsToSubmit = basket.length > 0
+                ? basket.map(item => ({
+                    business: salon?.id,
+                    service: item.service.id,
+                    date: item.date,
+                    start_time: item.slot.start,
+                }))
+                : [{
+                    business: salon?.id,
+                    service: selectedService!.id,
+                    date: selectedDate,
+                    start_time: selectedSlot!.start,
+                }];
+
+            const response = await api.post('/api/bookings/bulk/', { bookings: bookingsToSubmit });
 
             if (response.data.success) {
-                setMessage({ type: 'success', text: 'Booking confirmed! Check "My Bookings" for details.' });
+                setMessage({ type: 'success', text: `${bookingsToSubmit.length} Booking(s) confirmed! Check "My Bookings" for details.` });
+                setBasket([]);
                 setSelectedService(null);
                 setSelectedSlot(null);
             } else {
@@ -104,7 +142,7 @@ const SalonDetail: React.FC = () => {
             }
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || 'Error creating booking.';
-            setMessage({ type: 'error', text: errorMsg });
+            setMessage({ type: 'error', text: typeof errorMsg === 'object' ? 'One or more bookings failed validation.' : errorMsg });
         } finally {
             setBookingLoading(false);
             setTimeout(() => setMessage(null), 6000);
@@ -170,6 +208,45 @@ const SalonDetail: React.FC = () => {
                         </a>
                     )}
                 </div>
+
+                {/* Basket Section */}
+                {basket.length > 0 && (
+                    <div className="pt-10 border-t border-gray-50 space-y-6">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
+                                <CreditCard className="w-6 h-6 text-indigo-600" />
+                                Your Selection ({basket.length})
+                            </h2>
+                            <button
+                                onClick={() => setBasket([])}
+                                className="text-xs font-bold text-rose-500 hover:text-rose-700 uppercase tracking-widest"
+                            >
+                                Clear Selection
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {basket.map((item, index) => (
+                                <div key={index} className="bg-indigo-50/50 p-6 rounded-3xl border border-indigo-100 flex justify-between items-center group relative overflow-hidden">
+                                    <div className="space-y-1 z-10">
+                                        <p className="font-black text-gray-900">{item.service.name}</p>
+                                        <p className="text-[10px] font-bold text-indigo-600 uppercase">
+                                            {new Date(item.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} @ {item.slot.start}
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => removeFromBasket(index)}
+                                        className="bg-white p-2 rounded-xl text-rose-500 shadow-sm border border-rose-50 hover:bg-rose-500 hover:text-white transition-all z-10"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                    <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-125 transition-transform translate-y-4">
+                                        <Scissors className="w-16 h-16 text-indigo-600" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="pt-10 border-t border-gray-50">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
@@ -300,20 +377,30 @@ const SalonDetail: React.FC = () => {
                                         <p className="text-gray-400 font-bold italic">Please select your preferred time slot</p>
                                     )}
                                 </div>
-                                <button
-                                    onClick={handleConfirmBooking}
-                                    disabled={!selectedSlot || bookingLoading || user?.is_business}
-                                    className="w-full sm:w-auto px-16 py-6 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-4 uppercase tracking-[0.1em] text-xs"
-                                >
-                                    {bookingLoading ? (
-                                        <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-                                    ) : (
-                                        <>
-                                            <CreditCard className="w-5 h-5" />
-                                            {user?.is_business ? 'Booking Restricted' : 'Complete Booking'}
-                                        </>
-                                    )}
-                                </button>
+                                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                                    <button
+                                        onClick={addToBasket}
+                                        disabled={!selectedSlot}
+                                        className="px-8 py-6 border-2 border-indigo-600 text-indigo-600 rounded-[1.5rem] font-black hover:bg-indigo-50 transition-all disabled:opacity-30 uppercase tracking-[0.1em] text-xs flex items-center justify-center gap-2"
+                                    >
+                                        <Scissors className="w-4 h-4" />
+                                        Add to Basket
+                                    </button>
+                                    <button
+                                        onClick={handleConfirmBooking}
+                                        disabled={(!selectedSlot && basket.length === 0) || bookingLoading || user?.is_business}
+                                        className="px-12 py-6 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-4 uppercase tracking-[0.1em] text-xs"
+                                    >
+                                        {bookingLoading ? (
+                                            <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                        ) : (
+                                            <>
+                                                <CreditCard className="w-5 h-5" />
+                                                {user?.is_business ? 'Booking Restricted' : basket.length > 0 ? `Book ${basket.length + (selectedSlot ? 1 : 0)} Items` : 'Complete Booking'}
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
