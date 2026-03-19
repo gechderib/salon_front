@@ -30,6 +30,7 @@ const SalonDetail: React.FC = () => {
     const [basket, setBasket] = useState<{ service: Service, slot: AvailabilitySlot, date: string }[]>([]);
 
     const [bookingLoading, setBookingLoading] = useState(false);
+    const [bookingQuantity, setBookingQuantity] = useState(1);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -77,23 +78,17 @@ const SalonDetail: React.FC = () => {
     const addToBasket = () => {
         if (!selectedService || !selectedSlot) return;
 
-        // Check if already in basket
-        const exists = basket.find(item =>
-            item.service.id === selectedService.id &&
-            item.date === selectedDate &&
-            item.slot.start === selectedSlot.start
-        );
+        const newItems = Array(bookingQuantity).fill(null).map(() => ({
+            service: selectedService,
+            slot: selectedSlot,
+            date: selectedDate
+        }));
 
-        if (exists) {
-            setMessage({ type: 'error', text: 'This service is already in your basket for this time.' });
-            setTimeout(() => setMessage(null), 3000);
-            return;
-        }
-
-        setBasket([...basket, { service: selectedService, slot: selectedSlot, date: selectedDate }]);
+        setBasket([...basket, ...newItems]);
         setSelectedService(null);
         setSelectedSlot(null);
-        setMessage({ type: 'success', text: 'Added to basket!' });
+        setBookingQuantity(1);
+        setMessage({ type: 'success', text: `Added ${bookingQuantity} item(s) to basket!` });
         setTimeout(() => setMessage(null), 3000);
     };
 
@@ -372,6 +367,24 @@ const SalonDetail: React.FC = () => {
                                             <p className="text-2xl font-black text-indigo-600 tracking-tight">
                                                 {new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} at {selectedSlot.start}
                                             </p>
+                                            <div className="flex items-center gap-4 mt-2 bg-gray-50 px-4 py-2 rounded-2xl w-fit border border-gray-100 shadow-sm">
+                                                <button
+                                                    onClick={() => setBookingQuantity(Math.max(1, bookingQuantity - 1))}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white rounded-lg font-black text-gray-400 hover:text-indigo-600 border border-gray-100 transition-all active:scale-90"
+                                                >
+                                                    -
+                                                </button>
+                                                <div className="text-center min-w-[2.5rem]">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 leading-none mb-1">Seats</p>
+                                                    <span className="text-sm font-black text-gray-900">{bookingQuantity}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => setBookingQuantity(Math.min(selectedSlot.available_count, bookingQuantity + 1))}
+                                                    className="w-8 h-8 flex items-center justify-center bg-white rounded-lg font-black text-gray-400 hover:text-indigo-600 border border-gray-100 transition-all active:scale-90"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
                                         </>
                                     ) : (
                                         <p className="text-gray-400 font-bold italic">Please select your preferred time slot</p>
