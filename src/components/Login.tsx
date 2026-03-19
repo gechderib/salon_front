@@ -70,7 +70,9 @@ const Login: React.FC = () => {
                 setError('Google Login Failed');
             }
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Google Login Error');
+            console.error('Google Auth API Error:', err);
+            const msg = err.response?.data?.message || err.message || 'Network error connecting to backend';
+            setError(msg);
         }
     };
 
